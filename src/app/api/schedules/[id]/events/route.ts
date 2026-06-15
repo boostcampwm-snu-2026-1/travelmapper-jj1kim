@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { requireScheduleAuth } from "@/lib/session";
+import { DEFAULT_EVENT_COLOR } from "@/lib/constants";
+import { validateEventTiming, TIMING_ERROR_MESSAGE } from "@/lib/event-validation";
 
 // GET /api/schedules/[id]/events — Get all events for a schedule
 export async function GET(
@@ -46,6 +48,23 @@ export async function POST(
     }
 
     const db = await getDB();
+
+    // 만료/소유 스케줄 확인 후 서버측 시간 검증(형식·순서·기간·겹침)
+    const schedule = await db.findScheduleById(id);
+    if (!schedule) {
+      return NextResponse.json({ error: "스케줄을 찾을 수 없습니다." }, { status: 404 });
+    }
+
+    const existing = await db.getEvents(id, date);
+    const timingError = validateEventTiming(
+      { date, start_time, end_time },
+      { tripStart: schedule.trip_start, tripEnd: schedule.trip_end, existing }
+    );
+    if (timingError) {
+      const status = timingError === "overlap" ? 409 : 400;
+      return NextResponse.json({ error: TIMING_ERROR_MESSAGE[timingError] }, { status });
+    }
+
     const event = await db.createEvent({
       schedule_id: id,
       date,
@@ -54,7 +73,7 @@ export async function POST(
       title,
       description: description || null,
       participant: participant || null,
-      color: color || "#3B82F6",
+      color: color || DEFAULT_EVENT_COLOR,
     });
 
     return NextResponse.json(event);
