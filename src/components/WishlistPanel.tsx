@@ -13,6 +13,13 @@ import {
 import { useGuardState } from "@/lib/guard";
 import { getDatesInRange } from "@/lib/time";
 import { perPerson } from "@/lib/cost";
+import {
+  PLACE_CATEGORIES,
+  parseTransportDetails,
+  parsePlaceDetails,
+  parseStayDetails,
+  getCost,
+} from "@/lib/wishlist-details";
 import TransportForm from "./TransportForm";
 import PlaceForm from "./PlaceForm";
 import StayForm from "./StayForm";
@@ -35,25 +42,8 @@ const CATEGORY_ICONS: Record<WishlistCategory, string> = {
   "교통": "🚗", "숙박": "🏨", "식사": "🍽️", "카페&디저트": "☕", "관광지": "📍",
 };
 
-const PLACE_CATEGORIES: WishlistCategory[] = ["식사", "카페&디저트", "관광지"];
-
-export function parseTransportDetails(item: WishlistItem): TransportDetails | null {
-  if (item.category !== "교통" || !item.details) return null;
-  try { return typeof item.details === "string" ? JSON.parse(item.details) : item.details; }
-  catch { return null; }
-}
-
-export function parsePlaceDetails(item: WishlistItem): PlaceDetails | null {
-  if (!PLACE_CATEGORIES.includes(item.category) || !item.details) return null;
-  try { return typeof item.details === "string" ? JSON.parse(item.details) : item.details; }
-  catch { return null; }
-}
-
-export function parseStayDetails(item: WishlistItem): StayDetails | null {
-  if (item.category !== "숙박" || !item.details) return null;
-  try { return typeof item.details === "string" ? JSON.parse(item.details) : item.details; }
-  catch { return null; }
-}
+// 다른 파일들이 `import { parseX } from "./WishlistPanel"` 형태로 계속 쓸 수 있도록 재노출한다.
+export { parseTransportDetails, parsePlaceDetails, parseStayDetails } from "@/lib/wishlist-details";
 
 function formatTransportSummary(d: TransportDetails): string {
   const dep = d.departure_time?.split("T")[1] || "";
@@ -92,16 +82,6 @@ function stayAvailableSlots(d: StayDetails): TimeBlock[] {
     });
   }
   return slots;
-}
-
-function getCost(item: WishlistItem): number {
-  const t = parseTransportDetails(item);
-  if (t) return t.cost || 0;
-  const p = parsePlaceDetails(item);
-  if (p) return p.cost || 0;
-  const s = parseStayDetails(item);
-  if (s) return s.cost || 0;
-  return 0;
 }
 
 // ─── Detail Modal ───

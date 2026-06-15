@@ -3,6 +3,7 @@ import { getDB } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { DEFAULT_EXPIRY_DAYS } from "@/lib/constants";
 import { setSessionCookie } from "@/lib/session";
+import { toScheduleResponse } from "@/lib/serializers";
 import {
   validateScheduleName,
   validatePassword,
@@ -64,18 +65,11 @@ export async function POST(request: NextRequest) {
       expires_at: expiresAt.toISOString(),
     });
 
-    const res = NextResponse.json({
-      id: data.id,
-      name: data.name,
-      participants: data.participants,
-      created_at: data.created_at,
-      expires_at: data.expires_at,
-      trip_start: data.trip_start,
-      trip_end: data.trip_end,
-    });
+    const res = NextResponse.json(toScheduleResponse(data));
     setSessionCookie(res, data.id);
     return res;
-  } catch {
+  } catch (err) {
+    console.error("[api] schedules POST:", err);
     return NextResponse.json(
       { error: "서버 오류가 발생했습니다." },
       { status: 500 }

@@ -12,7 +12,10 @@ export function useDialog<T extends HTMLElement = HTMLDivElement>(
 ) {
   const ref = useRef<T>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  // 렌더 중 ref를 수정하지 않도록 effect에서 최신 onClose를 보관한다.
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     const node = ref.current;
