@@ -14,6 +14,7 @@ import { timeToMinutes, formatDateFull } from "@/lib/time";
 import { overlapMinutes } from "@/lib/overlap";
 import { MIN_SUGGESTION_OVERLAP_MIN } from "@/lib/constants";
 import ConfirmScheduleModal from "./ConfirmScheduleModal";
+import { useToast } from "./Toast";
 import type { SelectedTimeRange } from "./Timeline";
 
 interface WhatToDoPanelProps {
@@ -122,6 +123,7 @@ export default function WhatToDoPanel({
   const [loadingItems, setLoadingItems] = useState(true);
   const [detailItem, setDetailItem] = useState<WishlistItem | null>(null);
   const [confirmingItem, setConfirmingItem] = useState<WishlistItem | null>(null);
+  const { showToast } = useToast();
 
   const fetchItems = useCallback(async () => {
     setLoadingItems(true);
@@ -140,9 +142,11 @@ export default function WhatToDoPanel({
         hasOverlap30Min(item, selectedRange.date, selectedRange.startTime, selectedRange.endTime)
       );
       setItems(filtered);
-    } catch { /* silently fail */ }
+    } catch {
+      showToast("목록을 불러오지 못했습니다.");
+    }
     setLoadingItems(false);
-  }, [scheduleId, selectedRange]);
+  }, [scheduleId, selectedRange, showToast]);
 
   useEffect(() => {
     if (isOpen) fetchItems();
@@ -156,13 +160,21 @@ export default function WhatToDoPanel({
 
     if (item.confirmed) {
       const updated = { ...place, confirmed_slots: [] };
-      await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, confirmed: false, details: updated }),
-      });
-      fetchItems();
-      onConfirmChange?.();
+      try {
+        const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: item.id, confirmed: false, details: updated }),
+        });
+        if (res.ok) {
+          fetchItems();
+          onConfirmChange?.();
+        } else {
+          showToast("저장에 실패했습니다. 다시 시도해주세요.");
+        }
+      } catch {
+        showToast("서버와 연결할 수 없습니다.");
+      }
     } else {
       setConfirmingItem(item);
     }
@@ -172,15 +184,21 @@ export default function WhatToDoPanel({
     const place = parsePlaceDetails(item);
     if (!place) return;
     const updated = { ...place, confirmed_slots: slots };
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: item.id, confirmed: true, details: updated }),
-    });
-    if (res.ok) {
-      setConfirmingItem(null);
-      fetchItems();
-      onConfirmChange?.();
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, confirmed: true, details: updated }),
+      });
+      if (res.ok) {
+        setConfirmingItem(null);
+        fetchItems();
+        onConfirmChange?.();
+      } else {
+        showToast("저장에 실패했습니다. 다시 시도해주세요.");
+      }
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
     }
   });
 

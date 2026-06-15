@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useDialog } from "./useDialog";
 
 interface RouteModalProps {
   startLabel: string;
@@ -60,6 +61,7 @@ export default function RouteModal({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
 
   const fetchDirections = useCallback(async () => {
     setLoading(true);
@@ -166,8 +168,10 @@ export default function RouteModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" />
-      <div className="relative bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] flex flex-col z-10">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        className="relative bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-xl max-h-[90vh] flex flex-col z-10">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">경로 조회</h3>

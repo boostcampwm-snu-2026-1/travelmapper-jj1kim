@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { WishlistItem } from "@/lib/types";
 import { parseTransportDetails, parsePlaceDetails, parseStayDetails } from "./WishlistPanel";
+import { useDialog } from "./useDialog";
 
 interface MapViewModalProps {
   scheduleId: string;
@@ -79,6 +80,7 @@ export default function MapViewModal({
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const boundsSetRef = useRef(false);
+  const dialogRef = useDialog<HTMLDivElement>(onClose);
 
   // Fetch wishlist items and extract locations
   const fetchPins = useCallback(async () => {
@@ -186,7 +188,8 @@ export default function MapViewModal({
   const categories = [...new Set(pins.map((p) => p.item.category))];
 
   return (
-    <div className="fixed inset-0 z-[55] flex flex-col bg-white dark:bg-gray-900">
+    <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1}
+      className="fixed inset-0 z-[55] flex flex-col bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700
         bg-white dark:bg-gray-800 z-10">

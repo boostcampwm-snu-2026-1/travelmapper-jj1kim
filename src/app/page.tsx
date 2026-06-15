@@ -230,7 +230,7 @@ export default function Home() {
               className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
                 mode === "create"
                   ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
               새 스케줄 만들기
@@ -243,7 +243,7 @@ export default function Home() {
               className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
                 mode === "login"
                   ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
               기존 스케줄 접속
@@ -251,13 +251,23 @@ export default function Home() {
           </div>
 
           {/* Form */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (mode === "create") handleCreate();
+              else handleLogin();
+            }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4"
+          >
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              <label htmlFor="schedule-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 스케줄 이름
               </label>
               <input
+                id="schedule-name"
+                name="name"
                 type="text"
+                autoComplete="username"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="예: 부산 여행 2026"
@@ -268,11 +278,14 @@ export default function Home() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              <label htmlFor="schedule-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 비밀번호
               </label>
               <input
+                id="schedule-password"
+                name="password"
                 type="password"
+                autoComplete={mode === "create" ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="영문 소문자 + 숫자, 4~20자"
@@ -364,7 +377,7 @@ export default function Home() {
             )}
 
             <button
-              onClick={mode === "create" ? handleCreate : handleLogin}
+              type="submit"
               disabled={loading}
               className={`w-full py-2.5 rounded-lg font-medium text-white transition-all ${
                 loading
@@ -378,7 +391,7 @@ export default function Home() {
                 ? "스케줄 생성하기"
                 : "접속하기"}
             </button>
-          </div>
+          </form>
         </div>
         {loadingOverlay}
       </main>
