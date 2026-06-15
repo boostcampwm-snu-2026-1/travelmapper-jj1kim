@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { TimeBlock, ScheduleEvent } from "@/lib/types";
 import DragTimeTable from "./DragTimeTable";
+import { useDialog } from "./useDialog";
 
 interface ConfirmScheduleModalProps {
   scheduleId: string;
@@ -23,6 +24,7 @@ export default function ConfirmScheduleModal({
 }: ConfirmScheduleModalProps) {
   const [slots, setSlots] = useState<TimeBlock[]>(initialSlots);
   const [existingEvents, setExistingEvents] = useState<TimeBlock[]>([]);
+  const dialogRef = useDialog<HTMLDivElement>(onCancel);
 
   // Fetch all existing events + confirmed wishlist to show as occupied
   const fetchExisting = useCallback(async () => {
@@ -81,8 +83,10 @@ export default function ConfirmScheduleModal({
   }, [fetchExisting]);
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70] p-4">
-      <div className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70] p-4" onClick={onCancel}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-gray-800 w-full max-w-lg rounded-2xl shadow-xl flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-base font-bold text-gray-800 dark:text-gray-200">확정 일정 설정</h3>
           <button onClick={onCancel}
