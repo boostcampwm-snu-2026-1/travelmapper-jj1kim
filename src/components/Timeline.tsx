@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ScheduleEvent, WishlistItem, TransportDetails, PlaceDetails, TimeBlock } from "@/lib/types";
+import { timeToMinutes, minutesToTime, getDatesInRange, formatDateShort, formatDateFull } from "@/lib/time";
+import { rangesOverlap } from "@/lib/overlap";
 
 interface SelectedTimeRange {
   date: string;
@@ -46,42 +48,6 @@ function generateTimeSlots(): string[] {
     slots.push(`${String(h).padStart(2, "0")}:30`);
   }
   return slots;
-}
-
-// Convert "HH:MM" to total minutes from 00:00
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + (m || 0);
-}
-
-function getDatesInRange(start: string, end: string): string[] {
-  const dates: string[] = [];
-  const current = new Date(start + "T00:00:00");
-  const last = new Date(end + "T00:00:00");
-  while (current <= last) {
-    const y = current.getFullYear();
-    const m = String(current.getMonth() + 1).padStart(2, "0");
-    const d = String(current.getDate()).padStart(2, "0");
-    dates.push(`${y}-${m}-${d}`);
-    current.setDate(current.getDate() + 1);
-  }
-  return dates;
-}
-
-function formatDateShort(dateStr: string): { day: string; weekday: string; monthDay: string } {
-  const d = new Date(dateStr + "T00:00:00");
-  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
-  return {
-    day: String(d.getDate()),
-    weekday: weekdays[d.getDay()],
-    monthDay: `${d.getMonth() + 1}/${d.getDate()}`,
-  };
-}
-
-function formatDateFull(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00");
-  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${weekdays[d.getDay()]})`;
 }
 
 const ALL_TIME_SLOTS = generateTimeSlots();
@@ -360,18 +326,13 @@ export default function Timeline({
     [dates, OVERVIEW_SLOT_H]
   );
 
-  function minToTimeStr(m: number): string {
-    const c = Math.max(0, Math.min(1440, m));
-    return `${String(Math.floor(c / 60)).padStart(2, "0")}:${String(c % 60).padStart(2, "0")}`;
-  }
-
   // Check if a time range overlaps any event on that date
   function rangeHitsEvent(date: string, lo: number, hi: number): boolean {
     return allEventsWithConfirmed.some((e) => {
       if (e.date !== date) return false;
       const eStart = timeToMinutes(e.start_time);
       const eEnd = timeToMinutes(e.end_time);
-      return lo < eEnd && hi > eStart;
+      return rangesOverlap(lo, hi, eStart, eEnd);
     });
   }
 
@@ -541,8 +502,8 @@ export default function Timeline({
             if (hi - lo >= SNAP_MIN && !rangeHitsEvent(wtdDrag.date, lo, hi)) {
               onWhatToDoSelect?.({
                 date: wtdDrag.date,
-                startTime: minToTimeStr(lo),
-                endTime: minToTimeStr(hi),
+                startTime: minutesToTime(lo),
+                endTime: minutesToTime(hi),
               });
             }
             setWtdDrag(null);
@@ -662,7 +623,7 @@ export default function Timeline({
                         <div className="absolute left-1/2 -translate-x-1/2 z-30 bg-gray-900/85 text-white
                           text-[10px] px-2 py-1 rounded whitespace-nowrap backdrop-blur-sm pointer-events-none"
                           style={{ top: top - 22 }}>
-                          {minToTimeStr(lo)} ~ {minToTimeStr(hi)}
+                          {minutesToTime(lo)} ~ {minutesToTime(hi)}
                           {hitsEvent && <span className="text-red-300 ml-1">겹침</span>}
                         </div>
                       </>

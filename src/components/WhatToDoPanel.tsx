@@ -9,6 +9,9 @@ import {
   TimeBlock,
 } from "@/lib/types";
 import { parsePlaceDetails } from "./WishlistPanel";
+import { timeToMinutes, formatDateFull } from "@/lib/time";
+import { overlapMinutes } from "@/lib/overlap";
+import { MIN_SUGGESTION_OVERLAP_MIN } from "@/lib/constants";
 import ConfirmScheduleModal from "./ConfirmScheduleModal";
 import type { SelectedTimeRange } from "./Timeline";
 
@@ -28,17 +31,6 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 const TARGET_CATEGORIES: WishlistCategory[] = ["식사", "카페&디저트", "관광지"];
 
-function formatDateFull(d: string): string {
-  const dt = new Date(d + "T00:00:00");
-  const wd = ["일", "월", "화", "수", "목", "금", "토"];
-  return `${dt.getMonth() + 1}월 ${dt.getDate()}일 (${wd[dt.getDay()]})`;
-}
-
-function timeToMin(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + (m || 0);
-}
-
 function hasOverlap30Min(
   item: WishlistItem,
   date: string,
@@ -47,15 +39,13 @@ function hasOverlap30Min(
 ): boolean {
   const place = parsePlaceDetails(item);
   if (!place || !place.business_hours.length) return false;
-  const selStart = timeToMin(startTime);
-  const selEnd = timeToMin(endTime);
+  const selStart = timeToMinutes(startTime);
+  const selEnd = timeToMinutes(endTime);
   return place.business_hours.some((bh) => {
     if (bh.date !== date) return false;
-    const bhStart = timeToMin(bh.start_time);
-    const bhEnd = timeToMin(bh.end_time);
-    const overlapStart = Math.max(selStart, bhStart);
-    const overlapEnd = Math.min(selEnd, bhEnd);
-    return overlapEnd - overlapStart >= 30;
+    const bhStart = timeToMinutes(bh.start_time);
+    const bhEnd = timeToMinutes(bh.end_time);
+    return overlapMinutes(selStart, selEnd, bhStart, bhEnd) >= MIN_SUGGESTION_OVERLAP_MIN;
   });
 }
 

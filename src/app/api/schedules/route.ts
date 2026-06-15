@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { DEFAULT_EXPIRY_DAYS } from "@/lib/constants";
 
 // POST /api/schedules — Create a new schedule
 export async function POST(request: NextRequest) {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const days = expiresInDays || 90;
+    const days = expiresInDays || DEFAULT_EXPIRY_DAYS;
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + days);
 
