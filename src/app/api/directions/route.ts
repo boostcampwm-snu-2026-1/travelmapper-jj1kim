@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAnySession } from "@/lib/session";
 
 // Server-side proxy for Legacy Directions API
 // This bypasses the "new API mode" restriction on client-side calls
 export async function GET(request: NextRequest) {
+  // 익명 호출에 의한 쿼터 남용을 막기 위해 유효한 세션을 요구한다.
+  const auth = requireAnySession(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
   const { searchParams } = new URL(request.url);
   const origin = searchParams.get("origin");
   const destination = searchParams.get("destination");

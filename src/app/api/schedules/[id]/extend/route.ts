@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { MAX_EXTEND_DAYS, EXTEND_THRESHOLD_DAYS } from "@/lib/constants";
+import { requireScheduleAuth } from "@/lib/session";
 
 // PUT /api/schedules/[id]/extend — Extend schedule expiration
 export async function PUT(
@@ -9,6 +10,8 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { days } = await request.json();
 
     if (!days || days < 1 || days > MAX_EXTEND_DAYS) {

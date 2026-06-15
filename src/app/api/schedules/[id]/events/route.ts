@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { requireScheduleAuth } from "@/lib/session";
 
 // GET /api/schedules/[id]/events — Get all events for a schedule
 export async function GET(
@@ -8,6 +9,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { searchParams } = new URL(request.url);
     const date = searchParams.get("date") || undefined;
 
@@ -30,6 +33,8 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const body = await request.json();
     const { date, start_time, end_time, title, description, participant, color } = body;
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { requireScheduleAuth } from "@/lib/session";
 
 // PUT /api/schedules/[id]/participants — Update participants
 export async function PUT(
@@ -8,6 +9,8 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { participants } = await request.json();
 
     if (!participants || !Array.isArray(participants) || !participants.length) {

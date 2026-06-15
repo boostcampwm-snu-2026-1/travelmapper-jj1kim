@@ -44,9 +44,10 @@ export interface DB {
   }): Promise<WishlistItem>;
   updateWishlistItem(
     id: string,
+    scheduleId: string,
     data: { title?: string; added_by?: string; details?: string; confirmed?: boolean }
   ): Promise<WishlistItem | null>;
-  deleteWishlistItem(id: string): Promise<boolean>;
+  deleteWishlistItem(id: string, scheduleId: string): Promise<boolean>;
 }
 
 const globalForDb = globalThis as typeof globalThis & {

@@ -1,33 +1,42 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { generateShareToken, verifyShareToken } from "./share-token";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("share-token", () => {
   it("라운드트립: 생성한 토큰을 검증하면 원래 scheduleId를 돌려준다", () => {
     const id = "a1b2c3d4-0000-1111-2222-333344445555";
-    const token = generateShareToken(id);
-    expect(verifyShareToken(token)).toBe(id);
+    expect(verifyShareToken(generateShareToken(id))).toBe(id);
   });
 
-  it("서로 다른 scheduleId는 서로 다른 토큰을 만든다", () => {
-    expect(generateShareToken("id-one")).not.toBe(generateShareToken("id-two"));
-  });
-
-  it("변조된 토큰(서명 불일치)은 null을 반환한다", () => {
+  it("변조된 서명은 null을 반환한다", () => {
     const token = generateShareToken("schedule-xyz");
-    // base64url 디코딩 후 payload를 다른 id로 바꿔 재인코딩 → 서명 불일치
     const decoded = Buffer.from(token, "base64url").toString("utf-8");
-    const [, hmac] = decoded.split(":");
-    const forged = Buffer.from(`other-schedule:${hmac}`).toString("base64url");
+    const [sid, exp] = decoded.split(":");
+    const forged = Buffer.from(`${sid}:${exp}:deadbeef`).toString("base64url");
     expect(verifyShareToken(forged)).toBeNull();
   });
 
-  it("hmac 없이 scheduleId만 있는 토큰은 null을 반환한다", () => {
-    const noHmac = Buffer.from("schedule-only").toString("base64url");
-    expect(verifyShareToken(noHmac)).toBeNull();
+  it("scheduleId를 바꿔치기하면(서명 불일치) null을 반환한다", () => {
+    const token = generateShareToken("schedule-xyz");
+    const decoded = Buffer.from(token, "base64url").toString("utf-8");
+    const [, exp, sig] = decoded.split(":");
+    const forged = Buffer.from(`other-schedule:${exp}:${sig}`).toString("base64url");
+    expect(verifyShareToken(forged)).toBeNull();
   });
 
-  it("잘못된 base64/빈 문자열은 throw 없이 null을 반환한다", () => {
+  it("만료된 토큰은 null을 반환한다", () => {
+    const token = generateShareToken("schedule-xyz", 1000); // 1초 후 만료
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 2000); // 2초 경과
+    expect(verifyShareToken(token)).toBeNull();
+  });
+
+  it("형식이 잘못되거나 빈 토큰은 throw 없이 null을 반환한다", () => {
     expect(verifyShareToken("")).toBeNull();
     expect(verifyShareToken("!!!not-base64!!!")).toBeNull();
+    expect(verifyShareToken(Buffer.from("only-one-part").toString("base64url"))).toBeNull();
   });
 });
