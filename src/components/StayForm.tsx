@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { StayDetails, PlaceInfo } from "@/lib/types";
+import { WEEKDAYS } from "@/lib/time";
 import PlaceAutocomplete from "./PlaceAutocomplete";
 import TimeFieldInput, { isValidTimeStr } from "./TimeFieldInput";
 
@@ -108,7 +109,6 @@ export default function StayForm({
   // Group dates by week rows for calendar display
   const firstDate = new Date(tripDates[0] + "T00:00:00");
   const startDayOfWeek = firstDate.getDay();
-  const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
   return (
     <div className="space-y-3">

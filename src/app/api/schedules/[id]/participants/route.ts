@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { requireScheduleAuth } from "@/lib/session";
+import { toScheduleResponse } from "@/lib/serializers";
 
 // PUT /api/schedules/[id]/participants — Update participants
 export async function PUT(
@@ -8,6 +10,8 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { participants } = await request.json();
 
     if (!participants || !Array.isArray(participants) || !participants.length) {
@@ -35,16 +39,9 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json({
-      id: data.id,
-      name: data.name,
-      participants: data.participants,
-      created_at: data.created_at,
-      expires_at: data.expires_at,
-      trip_start: data.trip_start,
-      trip_end: data.trip_end,
-    });
-  } catch {
+    return NextResponse.json(toScheduleResponse(data));
+  } catch (err) {
+    console.error("[api] schedules/[id]/participants PUT:", err);
     return NextResponse.json(
       { error: "서버 오류가 발생했습니다." },
       { status: 500 }

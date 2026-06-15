@@ -9,6 +9,7 @@ import WishlistPanel from "@/components/WishlistPanel";
 import WhatToDoPanel from "@/components/WhatToDoPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import MapViewModal from "@/components/MapViewModal";
+import { validateScheduleName, validatePassword, validateExpiresInDays } from "@/lib/validation";
 
 type View = "landing" | "calendar" | "timeline";
 type Mode = "create" | "login";
@@ -100,25 +101,13 @@ export default function Home() {
       return;
     }
 
-    // Validate schedule name: no emoji, only letters/numbers/spaces/common symbols
-    const nameRegex = /^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s\-_.,!?@#&()'+:;/\\]+$/;
-    if (!nameRegex.test(name)) {
-      setError("스케줄 이름에 이모지나 특수 문자를 사용할 수 없습니다.");
-      return;
-    }
-
-    // Validate password: 4-20 chars, lowercase + numbers only
-    const pwRegex = /^[a-z0-9]{4,20}$/;
-    if (!pwRegex.test(password)) {
-      setError("비밀번호는 4~20자의 영문 소문자와 숫자 조합이어야 합니다.");
-      return;
-    }
-
+    const nameCheck = validateScheduleName(name);
+    if (!nameCheck.ok) { setError(nameCheck.error!); return; }
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.ok) { setError(pwCheck.error!); return; }
+    const daysCheck = validateExpiresInDays(expiresInDays);
+    if (!daysCheck.ok) { setError(daysCheck.error!); return; }
     const days = parseInt(expiresInDays, 10);
-    if (!days || days < 1 || days > 90) {
-      setError("만료 기한은 1일 이상 90일 이하로 입력해주세요.");
-      return;
-    }
 
     setLoading(true);
     try {
@@ -241,7 +230,7 @@ export default function Home() {
               className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
                 mode === "create"
                   ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
               새 스케줄 만들기
@@ -254,7 +243,7 @@ export default function Home() {
               className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
                 mode === "login"
                   ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
               기존 스케줄 접속
@@ -262,13 +251,23 @@ export default function Home() {
           </div>
 
           {/* Form */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (mode === "create") handleCreate();
+              else handleLogin();
+            }}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4"
+          >
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              <label htmlFor="schedule-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 스케줄 이름
               </label>
               <input
+                id="schedule-name"
+                name="name"
                 type="text"
+                autoComplete="username"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="예: 부산 여행 2026"
@@ -279,11 +278,14 @@ export default function Home() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              <label htmlFor="schedule-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 비밀번호
               </label>
               <input
+                id="schedule-password"
+                name="password"
                 type="password"
+                autoComplete={mode === "create" ? "new-password" : "current-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="영문 소문자 + 숫자, 4~20자"
@@ -375,7 +377,7 @@ export default function Home() {
             )}
 
             <button
-              onClick={mode === "create" ? handleCreate : handleLogin}
+              type="submit"
               disabled={loading}
               className={`w-full py-2.5 rounded-lg font-medium text-white transition-all ${
                 loading
@@ -389,7 +391,7 @@ export default function Home() {
                 ? "스케줄 생성하기"
                 : "접속하기"}
             </button>
-          </div>
+          </form>
         </div>
         {loadingOverlay}
       </main>
@@ -492,7 +494,7 @@ export default function Home() {
         : `여행이 끝난 지 ${daysSinceEnd}일 지났어요`;
     }
 
-    const handleExtend = async (days: number) => {
+    const handleExtend = (days: number) => pageGuard(async () => {
       try {
         const res = await fetch(`/api/schedules/${schedule.id}/extend`, {
           method: "PUT",
@@ -508,7 +510,7 @@ export default function Home() {
       } catch {
         setError("서버와 연결할 수 없습니다.");
       }
-    };
+    });
 
     const handleSaveParticipants = async () => {
       if (!participantsEditList.length) {
@@ -671,8 +673,10 @@ export default function Home() {
                   <button
                     key={d}
                     onClick={() => handleExtend(d)}
+                    disabled={pageBusy}
                     className="text-xs px-2 py-1 rounded-md bg-blue-50 text-blue-600
-                      hover:bg-blue-100 transition-colors font-medium"
+                      hover:bg-blue-100 transition-colors font-medium
+                      disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     +{d}일
                   </button>

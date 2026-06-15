@@ -10,11 +10,21 @@ import {
   StayDetails,
   TimeBlock,
 } from "@/lib/types";
-import { createGuard } from "@/lib/guard";
+import { useGuardState } from "@/lib/guard";
+import { getDatesInRange } from "@/lib/time";
+import { perPerson } from "@/lib/cost";
+import {
+  PLACE_CATEGORIES,
+  parseTransportDetails,
+  parsePlaceDetails,
+  parseStayDetails,
+  getCost,
+} from "@/lib/wishlist-details";
 import TransportForm from "./TransportForm";
 import PlaceForm from "./PlaceForm";
 import StayForm from "./StayForm";
 import ConfirmScheduleModal from "./ConfirmScheduleModal";
+import { useToast } from "./Toast";
 
 interface WishlistPanelProps {
   scheduleId: string;
@@ -32,25 +42,8 @@ const CATEGORY_ICONS: Record<WishlistCategory, string> = {
   "교통": "🚗", "숙박": "🏨", "식사": "🍽️", "카페&디저트": "☕", "관광지": "📍",
 };
 
-const PLACE_CATEGORIES: WishlistCategory[] = ["식사", "카페&디저트", "관광지"];
-
-export function parseTransportDetails(item: WishlistItem): TransportDetails | null {
-  if (item.category !== "교통" || !item.details) return null;
-  try { return typeof item.details === "string" ? JSON.parse(item.details) : item.details; }
-  catch { return null; }
-}
-
-export function parsePlaceDetails(item: WishlistItem): PlaceDetails | null {
-  if (!PLACE_CATEGORIES.includes(item.category) || !item.details) return null;
-  try { return typeof item.details === "string" ? JSON.parse(item.details) : item.details; }
-  catch { return null; }
-}
-
-export function parseStayDetails(item: WishlistItem): StayDetails | null {
-  if (item.category !== "숙박" || !item.details) return null;
-  try { return typeof item.details === "string" ? JSON.parse(item.details) : item.details; }
-  catch { return null; }
-}
+// 다른 파일들이 `import { parseX } from "./WishlistPanel"` 형태로 계속 쓸 수 있도록 재노출한다.
+export { parseTransportDetails, parsePlaceDetails, parseStayDetails } from "@/lib/wishlist-details";
 
 function formatTransportSummary(d: TransportDetails): string {
   const dep = d.departure_time?.split("T")[1] || "";
@@ -91,30 +84,6 @@ function stayAvailableSlots(d: StayDetails): TimeBlock[] {
   return slots;
 }
 
-function getDatesInRange(start: string, end: string): string[] {
-  const dates: string[] = [];
-  const cur = new Date(start + "T00:00:00");
-  const last = new Date(end + "T00:00:00");
-  while (cur <= last) {
-    const y = cur.getFullYear();
-    const m = String(cur.getMonth() + 1).padStart(2, "0");
-    const dd = String(cur.getDate()).padStart(2, "0");
-    dates.push(`${y}-${m}-${dd}`);
-    cur.setDate(cur.getDate() + 1);
-  }
-  return dates;
-}
-
-function getCost(item: WishlistItem): number {
-  const t = parseTransportDetails(item);
-  if (t) return t.cost || 0;
-  const p = parsePlaceDetails(item);
-  if (p) return p.cost || 0;
-  const s = parseStayDetails(item);
-  if (s) return s.cost || 0;
-  return 0;
-}
-
 // ─── Detail Modal ───
 function ItemDetailModal({
   item, participants, tripStart, tripEnd, scheduleId, tripDates, onClose, onUpdated,
@@ -126,35 +95,56 @@ function ItemDetailModal({
   const transport = parseTransportDetails(item);
   const place = parsePlaceDetails(item);
   const stay = parseStayDetails(item);
-  const guard = createGuard();
+  const [guard] = useGuardState();
+  const { showToast } = useToast();
 
   const handleDelete = () => guard(async () => {
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist?itemId=${item.id}`, { method: "DELETE" });
-    if (res.ok) { onUpdated(); onClose(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist?itemId=${item.id}`, { method: "DELETE" });
+      if (res.ok) { onUpdated(); onClose(); }
+      else showToast("삭제에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   });
 
   const handleEditTransport = (details: TransportDetails, addedBy: string) => guard(async () => {
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: item.id, title: details.transport_name, added_by: addedBy, details }),
-    });
-    if (res.ok) { setEditing(false); onUpdated(); onClose(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, title: details.transport_name, added_by: addedBy, details }),
+      });
+      if (res.ok) { setEditing(false); onUpdated(); onClose(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   });
 
   const handleEditPlace = (details: PlaceDetails, addedBy: string) => guard(async () => {
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: item.id, title: details.name, added_by: addedBy, details }),
-    });
-    if (res.ok) { setEditing(false); onUpdated(); onClose(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, title: details.name, added_by: addedBy, details }),
+      });
+      if (res.ok) { setEditing(false); onUpdated(); onClose(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   });
 
   const handleEditStay = (details: StayDetails, addedBy: string) => guard(async () => {
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: item.id, title: details.name, added_by: addedBy, details }),
-    });
-    if (res.ok) { setEditing(false); onUpdated(); onClose(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, title: details.name, added_by: addedBy, details }),
+      });
+      if (res.ok) { setEditing(false); onUpdated(); onClose(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   });
 
   if (editing) {
@@ -244,7 +234,7 @@ function ItemDetailModal({
         )}
         {cost > 0 && (
           <InfoRow label="비용"
-            value={`총 ${cost.toLocaleString()}원 · 인당 ${Math.floor(cost / participants.length).toLocaleString()}원`} />
+            value={`총 ${cost.toLocaleString()}원 · 인당 ${perPerson(cost, participants.length).toLocaleString()}원`} />
         )}
         <InfoRow label="추가자" value={item.added_by} />
         {transport?.notes && <NotesRow value={transport.notes} />}
@@ -359,6 +349,7 @@ export default function WishlistPanel({
   const [showAddModal, setShowAddModal] = useState(false);
   const [detailItem, setDetailItem] = useState<WishlistItem | null>(null);
   const [confirmingItem, setConfirmingItem] = useState<WishlistItem | null>(null);
+  const { showToast } = useToast();
 
   const tripDates = getDatesInRange(tripStart, tripEnd);
 
@@ -372,11 +363,15 @@ export default function WishlistPanel({
           const allItems: WishlistItem[] = await res.json();
           const found = allItems.find((i) => i.id === openItemId);
           if (found) setDetailItem(found);
+        } else {
+          showToast("목록을 불러오지 못했습니다.");
         }
-      } catch { /* silently fail */ }
+      } catch {
+        showToast("목록을 불러오지 못했습니다.");
+      }
       onItemOpened?.();
     })();
-  }, [openItemId, isOpen, scheduleId, onItemOpened]);
+  }, [openItemId, isOpen, scheduleId, onItemOpened, showToast]);
 
   // Mouse drag scroll for tabs
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -424,38 +419,57 @@ export default function WishlistPanel({
         const data = await res.json();
         cacheRef.current[activeCategory] = data;
         setItems(data);
+      } else {
+        showToast("목록을 불러오지 못했습니다.");
       }
-    } catch { /* silently fail */ }
+    } catch {
+      showToast("목록을 불러오지 못했습니다.");
+    }
     setLoadingItems(false);
-  }, [scheduleId, activeCategory]);
+  }, [scheduleId, activeCategory, showToast]);
 
   useEffect(() => { if (isOpen) fetchItems(); }, [isOpen, fetchItems]);
 
   // ─── Add handlers ───
-  const panelGuard = createGuard();
+  const [panelGuard] = useGuardState();
 
   const handleAddTransport = (details: TransportDetails, addedBy: string) => panelGuard(async () => {
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: "교통", title: details.transport_name, added_by: addedBy, details }),
-    });
-    if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: "교통", title: details.transport_name, added_by: addedBy, details }),
+      });
+      if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   });
 
   const handleAddPlace = (details: PlaceDetails, addedBy: string) => panelGuard(async () => {
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: activeCategory, title: details.name, added_by: addedBy, details }),
-    });
-    if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: activeCategory, title: details.name, added_by: addedBy, details }),
+      });
+      if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   });
 
   const handleAddStay = (details: StayDetails, addedBy: string) => panelGuard(async () => {
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ category: "숙박", title: details.name, added_by: addedBy, details }),
-    });
-    if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: "숙박", title: details.name, added_by: addedBy, details }),
+      });
+      if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   });
 
   // ─── Confirm toggle ───
@@ -475,11 +489,16 @@ export default function WishlistPanel({
   });
 
   const _toggleConfirmSimple = async (item: WishlistItem) => {
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: item.id, confirmed: !item.confirmed }),
-    });
-    if (res.ok) { invalidateCache(); fetchItems(); onConfirmChange?.(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, confirmed: !item.confirmed }),
+      });
+      if (res.ok) { invalidateCache(); fetchItems(); onConfirmChange?.(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   };
 
   const _unconfirmPlace = async (item: WishlistItem) => {
@@ -488,11 +507,16 @@ export default function WishlistPanel({
     const details = place || stay;
     if (!details) return;
     const updated = { ...details, confirmed_slots: [] };
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: item.id, confirmed: false, details: updated }),
-    });
-    if (res.ok) { invalidateCache(); fetchItems(); onConfirmChange?.(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, confirmed: false, details: updated }),
+      });
+      if (res.ok) { invalidateCache(); fetchItems(); onConfirmChange?.(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   };
 
   const handleConfirmPlace = (item: WishlistItem, slots: TimeBlock[]) => panelGuard(async () => {
@@ -501,11 +525,16 @@ export default function WishlistPanel({
     const details = place || stay;
     if (!details) return;
     const updated = { ...details, confirmed_slots: slots };
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: item.id, confirmed: true, details: updated }),
-    });
-    if (res.ok) { setConfirmingItem(null); fetchItems(); onConfirmChange?.(); }
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, confirmed: true, details: updated }),
+      });
+      if (res.ok) { setConfirmingItem(null); fetchItems(); onConfirmChange?.(); }
+      else showToast("저장에 실패했습니다. 다시 시도해주세요.");
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
+    }
   });
 
   const isTransport = activeCategory === "교통";
@@ -535,7 +564,7 @@ export default function WishlistPanel({
         )}
         {cost > 0 && (
           <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-0.5">
-            총 {cost.toLocaleString()}원 · 인당 {Math.floor(cost / participants.length).toLocaleString()}원
+            총 {cost.toLocaleString()}원 · 인당 {perPerson(cost, participants.length).toLocaleString()}원
           </p>
         )}
         <p className="text-[11px] text-gray-400 dark:text-gray-500">{item.added_by}</p>
@@ -585,12 +614,12 @@ export default function WishlistPanel({
             {items.map((item) => (
               <div key={item.id}
                 className={`rounded-lg px-3 py-2.5 group transition-all cursor-pointer ${
-                  item.confirmed ? "bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700" : "bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-700"
+                  item.confirmed ? "bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700" : "bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}>
                 <div className="flex items-start gap-2">
                   <button onClick={(e) => { e.stopPropagation(); handleConfirmClick(item); }}
                     className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                      item.confirmed ? "bg-green-50 dark:bg-green-900/300 border-green-500 text-white" : "border-gray-300 dark:border-gray-600 hover:border-blue-400"
+                      item.confirmed ? "bg-green-500 dark:bg-green-600 border-green-500 text-white" : "border-gray-300 dark:border-gray-600 hover:border-blue-400"
                     }`}>
                     {item.confirmed && (
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

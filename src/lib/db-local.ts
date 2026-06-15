@@ -331,6 +331,7 @@ export class LocalDB implements DB {
 
   async updateWishlistItem(
     id: string,
+    scheduleId: string,
     data: { title?: string; added_by?: string; details?: string; confirmed?: boolean }
   ): Promise<WishlistItem | null> {
     const db = getSqlite();
@@ -343,25 +344,26 @@ export class LocalDB implements DB {
     if (data.confirmed !== undefined) { sets.push("confirmed = ?"); values.push(data.confirmed ? 1 : 0); }
 
     if (!sets.length) return null;
-    values.push(id);
+    // schedule_id 조건으로 교차 스케줄 수정을 차단
+    values.push(id, scheduleId);
 
     const result = db
-      .prepare(`UPDATE wishlist_items SET ${sets.join(", ")} WHERE id = ?`)
+      .prepare(`UPDATE wishlist_items SET ${sets.join(", ")} WHERE id = ? AND schedule_id = ?`)
       .run(...values);
 
     if (result.changes === 0) return null;
 
     const row = db
-      .prepare("SELECT * FROM wishlist_items WHERE id = ?")
-      .get(id) as Record<string, unknown>;
+      .prepare("SELECT * FROM wishlist_items WHERE id = ? AND schedule_id = ?")
+      .get(id, scheduleId) as Record<string, unknown>;
     return rowToWishlistItem(row);
   }
 
-  async deleteWishlistItem(id: string): Promise<boolean> {
+  async deleteWishlistItem(id: string, scheduleId: string): Promise<boolean> {
     const db = getSqlite();
     const result = db
-      .prepare("DELETE FROM wishlist_items WHERE id = ?")
-      .run(id);
+      .prepare("DELETE FROM wishlist_items WHERE id = ? AND schedule_id = ?")
+      .run(id, scheduleId);
     return result.changes > 0;
   }
 }

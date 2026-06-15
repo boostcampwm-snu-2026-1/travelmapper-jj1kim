@@ -2,6 +2,8 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { TimeBlock } from "@/lib/types";
+import { timeToMinutes, minutesToTime, formatDateHeader } from "@/lib/time";
+import { blocksOverlap, isRangeWithinAvailable } from "@/lib/overlap";
 
 interface DragTimeTableProps {
   dates: string[];
@@ -15,36 +17,6 @@ interface DragTimeTableProps {
   endHour?: number;
   blockColor?: string;
   availableColor?: string;
-}
-
-function timeToMin(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + (m || 0);
-}
-
-function minToTime(m: number): string {
-  const clamped = Math.max(0, Math.min(1440, m));
-  return `${String(Math.floor(clamped / 60)).padStart(2, "0")}:${String(clamped % 60).padStart(2, "0")}`;
-}
-
-function formatDateHeader(d: string): string {
-  const dt = new Date(d + "T00:00:00");
-  const wd = ["일", "월", "화", "수", "목", "금", "토"];
-  return `${dt.getMonth() + 1}/${dt.getDate()} ${wd[dt.getDay()]}`;
-}
-
-function blocksOverlap(a: TimeBlock, b: TimeBlock): boolean {
-  return a.date === b.date && a.start_time < b.end_time && a.end_time > b.start_time;
-}
-
-function isWithinAvailable(
-  date: string, startMin: number, endMin: number, available: TimeBlock[]
-): boolean {
-  const s = minToTime(startMin);
-  const e = minToTime(endMin);
-  return available.some(
-    (a) => a.date === date && s >= a.start_time && e <= a.end_time
-  );
 }
 
 export default function DragTimeTable({
@@ -140,8 +112,8 @@ export default function DragTimeTable({
     if (hi - lo >= snapMinutes) {
       const newBlock: TimeBlock = {
         date: dragState.date,
-        start_time: minToTime(lo),
-        end_time: minToTime(hi),
+        start_time: minutesToTime(lo),
+        end_time: minutesToTime(hi),
       };
 
       // Check: no overlap with existing events
@@ -149,7 +121,7 @@ export default function DragTimeTable({
       // Check: no overlap with other user blocks
       const hitsOwnBlocks = blocks.some((b) => blocksOverlap(newBlock, b));
       // Check: within available slots
-      const withinAvail = !availableSlots || isWithinAvailable(dragState.date, lo, hi, availableSlots);
+      const withinAvail = !availableSlots || isRangeWithinAvailable(dragState.date, lo, hi, availableSlots);
 
       if (!hitsExisting && !hitsOwnBlocks && withinAvail) {
         onBlocksChange([...blocks, newBlock]);
@@ -204,7 +176,7 @@ export default function DragTimeTable({
         <div className="flex-shrink-0 relative" style={{ width: 40, height: totalHeight }}>
           {gridLines.filter((m) => m % 60 === 0).map((m) => (
             <div key={m} className="absolute right-1 text-[10px] text-gray-400 dark:text-gray-500" style={{ top: getYFromMin(m) - 6 }}>
-              {minToTime(m)}
+              {minutesToTime(m)}
             </div>
           ))}
         </div>
@@ -220,8 +192,8 @@ export default function DragTimeTable({
 
             {/* Available slots highlight */}
             {availableSlots?.filter((s) => s.date === date).map((s, i) => {
-              const top = getYFromMin(timeToMin(s.start_time));
-              const bot = getYFromMin(timeToMin(s.end_time));
+              const top = getYFromMin(timeToMinutes(s.start_time));
+              const bot = getYFromMin(timeToMinutes(s.end_time));
               return (
                 <div key={`avail-${i}`} className="absolute left-0 right-0 pointer-events-none"
                   style={{ top, height: bot - top, backgroundColor: availableColor, opacity: 0.5 }} />
@@ -230,8 +202,8 @@ export default function DragTimeTable({
 
             {/* Existing events (grey) */}
             {existingEvents.filter((ev) => ev.date === date).map((ev, i) => {
-              const top = getYFromMin(timeToMin(ev.start_time));
-              const bot = getYFromMin(timeToMin(ev.end_time));
+              const top = getYFromMin(timeToMinutes(ev.start_time));
+              const bot = getYFromMin(timeToMinutes(ev.end_time));
               return (
                 <div key={`exist-${i}`} className="absolute left-0.5 right-0.5 rounded bg-gray-300 dark:bg-gray-600 pointer-events-none"
                   style={{ top, height: Math.max(bot - top, 8) }} />
@@ -241,8 +213,8 @@ export default function DragTimeTable({
             {/* User blocks */}
             {blocks.filter((b) => b.date === date).map((b, i) => {
               const globalIdx = blocks.findIndex((x) => x === b);
-              const top = getYFromMin(timeToMin(b.start_time));
-              const bot = getYFromMin(timeToMin(b.end_time));
+              const top = getYFromMin(timeToMinutes(b.start_time));
+              const bot = getYFromMin(timeToMinutes(b.end_time));
               const height = Math.max(bot - top, 14);
               const isTooltipOpen = tooltipIdx === globalIdx;
 
@@ -286,7 +258,7 @@ export default function DragTimeTable({
                 <div className="absolute left-0.5 right-0.5 rounded pointer-events-none flex items-center justify-center"
                   style={{ top, height: bot - top, backgroundColor: blockColor, opacity: 0.5 }}>
                   <span className="text-white text-[9px] font-medium">
-                    {minToTime(lo)}~{minToTime(hi)}
+                    {minutesToTime(lo)}~{minutesToTime(hi)}
                   </span>
                 </div>
               );

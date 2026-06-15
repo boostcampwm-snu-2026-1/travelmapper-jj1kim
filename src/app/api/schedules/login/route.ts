@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { setSessionCookie } from "@/lib/session";
+import { toScheduleResponse } from "@/lib/serializers";
 
 // POST /api/schedules/login — Login to an existing schedule
 export async function POST(request: NextRequest) {
@@ -35,15 +37,9 @@ export async function POST(request: NextRequest) {
 
       const isMatch = await bcrypt.compare(password, schedule.password_hash);
       if (isMatch) {
-        return NextResponse.json({
-          id: schedule.id,
-          name: schedule.name,
-          participants: schedule.participants,
-          created_at: schedule.created_at,
-          expires_at: schedule.expires_at,
-          trip_start: schedule.trip_start,
-          trip_end: schedule.trip_end,
-        });
+        const res = NextResponse.json(toScheduleResponse(schedule));
+        setSessionCookie(res, schedule.id);
+        return res;
       }
     }
 
@@ -51,7 +47,8 @@ export async function POST(request: NextRequest) {
       { error: "비밀번호가 일치하지 않거나 만료된 스케줄입니다." },
       { status: 401 }
     );
-  } catch {
+  } catch (err) {
+    console.error("[api] schedules/login POST:", err);
     return NextResponse.json(
       { error: "서버 오류가 발생했습니다." },
       { status: 500 }

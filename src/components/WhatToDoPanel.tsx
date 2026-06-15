@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { createGuard } from "@/lib/guard";
+import { useGuardState } from "@/lib/guard";
+import { perPerson } from "@/lib/cost";
 import {
   WishlistItem,
   WishlistCategory,
@@ -9,7 +10,11 @@ import {
   TimeBlock,
 } from "@/lib/types";
 import { parsePlaceDetails } from "./WishlistPanel";
+import { timeToMinutes, formatDateFull } from "@/lib/time";
+import { overlapMinutes } from "@/lib/overlap";
+import { MIN_SUGGESTION_OVERLAP_MIN } from "@/lib/constants";
 import ConfirmScheduleModal from "./ConfirmScheduleModal";
+import { useToast } from "./Toast";
 import type { SelectedTimeRange } from "./Timeline";
 
 interface WhatToDoPanelProps {
@@ -28,17 +33,6 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 const TARGET_CATEGORIES: WishlistCategory[] = ["식사", "카페&디저트", "관광지"];
 
-function formatDateFull(d: string): string {
-  const dt = new Date(d + "T00:00:00");
-  const wd = ["일", "월", "화", "수", "목", "금", "토"];
-  return `${dt.getMonth() + 1}월 ${dt.getDate()}일 (${wd[dt.getDay()]})`;
-}
-
-function timeToMin(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + (m || 0);
-}
-
 function hasOverlap30Min(
   item: WishlistItem,
   date: string,
@@ -47,15 +41,13 @@ function hasOverlap30Min(
 ): boolean {
   const place = parsePlaceDetails(item);
   if (!place || !place.business_hours.length) return false;
-  const selStart = timeToMin(startTime);
-  const selEnd = timeToMin(endTime);
+  const selStart = timeToMinutes(startTime);
+  const selEnd = timeToMinutes(endTime);
   return place.business_hours.some((bh) => {
     if (bh.date !== date) return false;
-    const bhStart = timeToMin(bh.start_time);
-    const bhEnd = timeToMin(bh.end_time);
-    const overlapStart = Math.max(selStart, bhStart);
-    const overlapEnd = Math.min(selEnd, bhEnd);
-    return overlapEnd - overlapStart >= 30;
+    const bhStart = timeToMinutes(bh.start_time);
+    const bhEnd = timeToMinutes(bh.end_time);
+    return overlapMinutes(selStart, selEnd, bhStart, bhEnd) >= MIN_SUGGESTION_OVERLAP_MIN;
   });
 }
 
@@ -99,7 +91,7 @@ function ItemDetailReadonly({
           )}
           {cost > 0 && (
             <InfoRow label="비용"
-              value={`총 ${cost.toLocaleString()}원 · 인당 ${Math.floor(cost / participants.length).toLocaleString()}원`} />
+              value={`총 ${cost.toLocaleString()}원 · 인당 ${perPerson(cost, participants.length).toLocaleString()}원`} />
           )}
           <InfoRow label="추가자" value={item.added_by} />
           {place?.notes && <InfoRow label="관련 정보" value={place.notes} />}
@@ -131,6 +123,7 @@ export default function WhatToDoPanel({
   const [loadingItems, setLoadingItems] = useState(true);
   const [detailItem, setDetailItem] = useState<WishlistItem | null>(null);
   const [confirmingItem, setConfirmingItem] = useState<WishlistItem | null>(null);
+  const { showToast } = useToast();
 
   const fetchItems = useCallback(async () => {
     setLoadingItems(true);
@@ -149,15 +142,17 @@ export default function WhatToDoPanel({
         hasOverlap30Min(item, selectedRange.date, selectedRange.startTime, selectedRange.endTime)
       );
       setItems(filtered);
-    } catch { /* silently fail */ }
+    } catch {
+      showToast("목록을 불러오지 못했습니다.");
+    }
     setLoadingItems(false);
-  }, [scheduleId, selectedRange]);
+  }, [scheduleId, selectedRange, showToast]);
 
   useEffect(() => {
     if (isOpen) fetchItems();
   }, [isOpen, fetchItems]);
 
-  const wtdGuard = createGuard();
+  const [wtdGuard] = useGuardState();
 
   const handleToggleConfirm = (item: WishlistItem) => wtdGuard(async () => {
     const place = parsePlaceDetails(item);
@@ -165,13 +160,21 @@ export default function WhatToDoPanel({
 
     if (item.confirmed) {
       const updated = { ...place, confirmed_slots: [] };
-      await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: item.id, confirmed: false, details: updated }),
-      });
-      fetchItems();
-      onConfirmChange?.();
+      try {
+        const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ itemId: item.id, confirmed: false, details: updated }),
+        });
+        if (res.ok) {
+          fetchItems();
+          onConfirmChange?.();
+        } else {
+          showToast("저장에 실패했습니다. 다시 시도해주세요.");
+        }
+      } catch {
+        showToast("서버와 연결할 수 없습니다.");
+      }
     } else {
       setConfirmingItem(item);
     }
@@ -181,15 +184,21 @@ export default function WhatToDoPanel({
     const place = parsePlaceDetails(item);
     if (!place) return;
     const updated = { ...place, confirmed_slots: slots };
-    const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ itemId: item.id, confirmed: true, details: updated }),
-    });
-    if (res.ok) {
-      setConfirmingItem(null);
-      fetchItems();
-      onConfirmChange?.();
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: item.id, confirmed: true, details: updated }),
+      });
+      if (res.ok) {
+        setConfirmingItem(null);
+        fetchItems();
+        onConfirmChange?.();
+      } else {
+        showToast("저장에 실패했습니다. 다시 시도해주세요.");
+      }
+    } catch {
+      showToast("서버와 연결할 수 없습니다.");
     }
   });
 
@@ -267,7 +276,7 @@ export default function WhatToDoPanel({
                             }`}>{item.title}</p>
                             {cost > 0 && (
                               <p className="text-[11px] text-blue-500 dark:text-blue-400">
-                                인당 {Math.floor(cost / participants.length).toLocaleString()}원
+                                인당 {perPerson(cost, participants.length).toLocaleString()}원
                               </p>
                             )}
                             <p className="text-[11px] text-gray-400 dark:text-gray-500">{item.added_by}</p>
