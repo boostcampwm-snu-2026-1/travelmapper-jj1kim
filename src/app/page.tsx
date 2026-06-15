@@ -481,7 +481,7 @@ export default function Home() {
         : `여행이 끝난 지 ${daysSinceEnd}일 지났어요`;
     }
 
-    const handleExtend = async (days: number) => {
+    const handleExtend = (days: number) => pageGuard(async () => {
       try {
         const res = await fetch(`/api/schedules/${schedule.id}/extend`, {
           method: "PUT",
@@ -497,7 +497,7 @@ export default function Home() {
       } catch {
         setError("서버와 연결할 수 없습니다.");
       }
-    };
+    });
 
     const handleSaveParticipants = async () => {
       if (!participantsEditList.length) {
@@ -660,8 +660,10 @@ export default function Home() {
                   <button
                     key={d}
                     onClick={() => handleExtend(d)}
+                    disabled={pageBusy}
                     className="text-xs px-2 py-1 rounded-md bg-blue-50 text-blue-600
-                      hover:bg-blue-100 transition-colors font-medium"
+                      hover:bg-blue-100 transition-colors font-medium
+                      disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     +{d}일
                   </button>

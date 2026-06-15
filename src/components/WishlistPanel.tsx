@@ -10,8 +10,9 @@ import {
   StayDetails,
   TimeBlock,
 } from "@/lib/types";
-import { createGuard } from "@/lib/guard";
+import { useGuardState } from "@/lib/guard";
 import { getDatesInRange } from "@/lib/time";
+import { perPerson } from "@/lib/cost";
 import TransportForm from "./TransportForm";
 import PlaceForm from "./PlaceForm";
 import StayForm from "./StayForm";
@@ -113,7 +114,7 @@ function ItemDetailModal({
   const transport = parseTransportDetails(item);
   const place = parsePlaceDetails(item);
   const stay = parseStayDetails(item);
-  const guard = createGuard();
+  const [guard] = useGuardState();
 
   const handleDelete = () => guard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist?itemId=${item.id}`, { method: "DELETE" });
@@ -231,7 +232,7 @@ function ItemDetailModal({
         )}
         {cost > 0 && (
           <InfoRow label="비용"
-            value={`총 ${cost.toLocaleString()}원 · 인당 ${Math.floor(cost / participants.length).toLocaleString()}원`} />
+            value={`총 ${cost.toLocaleString()}원 · 인당 ${perPerson(cost, participants.length).toLocaleString()}원`} />
         )}
         <InfoRow label="추가자" value={item.added_by} />
         {transport?.notes && <NotesRow value={transport.notes} />}
@@ -419,7 +420,7 @@ export default function WishlistPanel({
   useEffect(() => { if (isOpen) fetchItems(); }, [isOpen, fetchItems]);
 
   // ─── Add handlers ───
-  const panelGuard = createGuard();
+  const [panelGuard] = useGuardState();
 
   const handleAddTransport = (details: TransportDetails, addedBy: string) => panelGuard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
@@ -522,7 +523,7 @@ export default function WishlistPanel({
         )}
         {cost > 0 && (
           <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-0.5">
-            총 {cost.toLocaleString()}원 · 인당 {Math.floor(cost / participants.length).toLocaleString()}원
+            총 {cost.toLocaleString()}원 · 인당 {perPerson(cost, participants.length).toLocaleString()}원
           </p>
         )}
         <p className="text-[11px] text-gray-400 dark:text-gray-500">{item.added_by}</p>

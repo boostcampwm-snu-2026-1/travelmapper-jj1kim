@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ScheduleEvent, WishlistItem, TransportDetails, PlaceDetails, TimeBlock } from "@/lib/types";
 import { timeToMinutes, minutesToTime, getDatesInRange, formatDateShort, formatDateFull } from "@/lib/time";
 import { rangesOverlap } from "@/lib/overlap";
+import { perPerson } from "@/lib/cost";
 
 interface SelectedTimeRange {
   date: string;
@@ -350,8 +351,7 @@ export default function Timeline({
       }
     } catch { /* skip */ }
   }
-  const perPersonCost =
-    participants.length > 0 ? Math.floor(totalConfirmedCost / participants.length) : 0;
+  const perPersonCost = perPerson(totalConfirmedCost, participants.length);
 
   const [showCostBreakdown, setShowCostBreakdown] = useState(false);
   const costBadgeRef = useRef<HTMLButtonElement>(null);
@@ -441,7 +441,7 @@ export default function Timeline({
                         <div key={cat} className="flex justify-between gap-3">
                           <span>{categoryIcons[cat] || ""} {cat}</span>
                           <span className="font-medium">
-                            {Math.floor(total / participants.length).toLocaleString()}원
+                            {perPerson(total, participants.length).toLocaleString()}원
                           </span>
                         </div>
                       ))}

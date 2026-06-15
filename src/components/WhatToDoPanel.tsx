@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { createGuard } from "@/lib/guard";
+import { useGuardState } from "@/lib/guard";
+import { perPerson } from "@/lib/cost";
 import {
   WishlistItem,
   WishlistCategory,
@@ -89,7 +90,7 @@ function ItemDetailReadonly({
           )}
           {cost > 0 && (
             <InfoRow label="비용"
-              value={`총 ${cost.toLocaleString()}원 · 인당 ${Math.floor(cost / participants.length).toLocaleString()}원`} />
+              value={`총 ${cost.toLocaleString()}원 · 인당 ${perPerson(cost, participants.length).toLocaleString()}원`} />
           )}
           <InfoRow label="추가자" value={item.added_by} />
           {place?.notes && <InfoRow label="관련 정보" value={place.notes} />}
@@ -147,7 +148,7 @@ export default function WhatToDoPanel({
     if (isOpen) fetchItems();
   }, [isOpen, fetchItems]);
 
-  const wtdGuard = createGuard();
+  const [wtdGuard] = useGuardState();
 
   const handleToggleConfirm = (item: WishlistItem) => wtdGuard(async () => {
     const place = parsePlaceDetails(item);
@@ -257,7 +258,7 @@ export default function WhatToDoPanel({
                             }`}>{item.title}</p>
                             {cost > 0 && (
                               <p className="text-[11px] text-blue-500 dark:text-blue-400">
-                                인당 {Math.floor(cost / participants.length).toLocaleString()}원
+                                인당 {perPerson(cost, participants.length).toLocaleString()}원
                               </p>
                             )}
                             <p className="text-[11px] text-gray-400 dark:text-gray-500">{item.added_by}</p>
