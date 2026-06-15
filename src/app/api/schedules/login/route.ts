@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { setSessionCookie } from "@/lib/session";
 
 // POST /api/schedules/login — Login to an existing schedule
 export async function POST(request: NextRequest) {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
 
       const isMatch = await bcrypt.compare(password, schedule.password_hash);
       if (isMatch) {
-        return NextResponse.json({
+        const res = NextResponse.json({
           id: schedule.id,
           name: schedule.name,
           participants: schedule.participants,
@@ -44,6 +45,8 @@ export async function POST(request: NextRequest) {
           trip_start: schedule.trip_start,
           trip_end: schedule.trip_end,
         });
+        setSessionCookie(res, schedule.id);
+        return res;
       }
     }
 

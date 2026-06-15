@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { generateShareToken, verifyShareToken } from "@/lib/share-token";
+import { requireScheduleAuth, setSessionCookie } from "@/lib/session";
 
 // GET /api/schedules/share?token=xxx — Access schedule via share link
 export async function GET(request: NextRequest) {
@@ -25,7 +26,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "만료된 스케줄입니다." }, { status: 410 });
     }
 
-    return NextResponse.json({
+    // 유효한 공유 링크 접근자에게 해당 스케줄의 세션을 발급한다.
+    const res = NextResponse.json({
       id: schedule.id,
       name: schedule.name,
       participants: schedule.participants,
@@ -34,6 +36,8 @@ export async function GET(request: NextRequest) {
       trip_start: schedule.trip_start,
       trip_end: schedule.trip_end,
     });
+    setSessionCookie(res, schedule.id);
+    return res;
   } catch {
     return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
@@ -46,6 +50,10 @@ export async function POST(request: NextRequest) {
     if (!scheduleId) {
       return NextResponse.json({ error: "스케줄 ID가 필요합니다." }, { status: 400 });
     }
+
+    // 본인 스케줄에 대해서만 공유 토큰을 발급할 수 있다.
+    const auth = requireScheduleAuth(request, scheduleId);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const token = generateShareToken(scheduleId);
     return NextResponse.json({ token });

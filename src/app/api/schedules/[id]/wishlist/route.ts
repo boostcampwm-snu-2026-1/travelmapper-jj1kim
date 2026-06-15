@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { WishlistCategory, WISHLIST_CATEGORIES } from "@/lib/types";
+import { requireScheduleAuth } from "@/lib/session";
 
 // GET /api/schedules/[id]/wishlist
 export async function GET(
@@ -9,6 +10,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category") as WishlistCategory | null;
     const confirmedOnly = searchParams.get("confirmed") === "true";
@@ -37,6 +40,8 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { category, title, added_by, details } = await request.json();
 
     if (!category || !title || !added_by) {
@@ -72,8 +77,14 @@ export async function POST(
 }
 
 // PUT /api/schedules/[id]/wishlist — Update a wishlist item
-export async function PUT(request: NextRequest) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { itemId, title, added_by, details, confirmed } =
       await request.json();
 
@@ -98,7 +109,7 @@ export async function PUT(request: NextRequest) {
       updateData.details = typeof details === "string" ? details : JSON.stringify(details);
     if (confirmed !== undefined) updateData.confirmed = confirmed;
 
-    const item = await db.updateWishlistItem(itemId, updateData);
+    const item = await db.updateWishlistItem(itemId, id, updateData);
 
     if (!item) {
       return NextResponse.json(
@@ -117,8 +128,14 @@ export async function PUT(request: NextRequest) {
 }
 
 // DELETE /api/schedules/[id]/wishlist
-export async function DELETE(request: NextRequest) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id } = await params;
+    const auth = requireScheduleAuth(request, id);
+    if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const { searchParams } = new URL(request.url);
     const itemId = searchParams.get("itemId");
 
@@ -130,7 +147,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const db = await getDB();
-    const deleted = await db.deleteWishlistItem(itemId);
+    const deleted = await db.deleteWishlistItem(itemId, id);
 
     if (!deleted) {
       return NextResponse.json(

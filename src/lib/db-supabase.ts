@@ -188,12 +188,14 @@ export class SupabaseDB implements DB {
 
   async updateWishlistItem(
     id: string,
+    scheduleId: string,
     updates: { title?: string; added_by?: string; details?: string; confirmed?: boolean }
   ): Promise<WishlistItem | null> {
     const { data, error } = await getSupabase()
       .from("wishlist_items")
       .update(updates)
       .eq("id", id)
+      .eq("schedule_id", scheduleId)
       .select()
       .single();
 
@@ -201,11 +203,12 @@ export class SupabaseDB implements DB {
     return data;
   }
 
-  async deleteWishlistItem(id: string): Promise<boolean> {
+  async deleteWishlistItem(id: string, scheduleId: string): Promise<boolean> {
     const { error } = await getSupabase()
       .from("wishlist_items")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("schedule_id", scheduleId);
 
     return !error;
   }

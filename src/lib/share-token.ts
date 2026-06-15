@@ -1,21 +1,33 @@
-import crypto from "crypto";
+// 스케줄 공유 링크용 서명 토큰.
+// 형식: base64url( "scheduleId:exp:hmac(scheduleId:exp)" )
+// - exp(만료 epoch ms)를 서명 입력에 포함해 만료된 링크를 무효화한다.
+// - 전체 HMAC 다이제스트 + 타이밍 안전 비교로 위조를 방지한다.
+import { hmacHex, timingSafeEqualHex } from "./signing";
 
-const SECRET = process.env.SHARE_LINK_SECRET || "travelmapper-default-share-secret-2026";
+const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일
 
-export function generateShareToken(scheduleId: string): string {
-  const hmac = crypto.createHmac("sha256", SECRET).update(scheduleId).digest("hex").slice(0, 16);
-  const payload = `${scheduleId}:${hmac}`;
-  return Buffer.from(payload).toString("base64url");
+export function generateShareToken(
+  scheduleId: string,
+  ttlMs: number = DEFAULT_TTL_MS
+): string {
+  const exp = Date.now() + ttlMs;
+  const body = `${scheduleId}:${exp}`;
+  return Buffer.from(`${body}:${hmacHex(body)}`).toString("base64url");
 }
 
 export function verifyShareToken(token: string): string | null {
   try {
-    const payload = Buffer.from(token, "base64url").toString("utf-8");
-    const [scheduleId, hmac] = payload.split(":");
-    if (!scheduleId || !hmac) return null;
+    const decoded = Buffer.from(token, "base64url").toString("utf-8");
+    const parts = decoded.split(":");
+    if (parts.length !== 3) return null;
 
-    const expected = crypto.createHmac("sha256", SECRET).update(scheduleId).digest("hex").slice(0, 16);
-    if (hmac !== expected) return null;
+    const [scheduleId, expStr, sig] = parts;
+    if (!scheduleId || !expStr || !sig) return null;
+
+    if (!timingSafeEqualHex(sig, hmacHex(`${scheduleId}:${expStr}`))) return null;
+
+    const exp = Number(expStr);
+    if (!Number.isFinite(exp) || Date.now() > exp) return null;
 
     return scheduleId;
   } catch {
