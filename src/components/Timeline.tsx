@@ -485,7 +485,9 @@ export default function Timeline({
             if (!whatToDoMode) return;
             const pos = getOverviewDateAndMin(e.clientX, e.clientY);
             if (!pos) return;
-            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+            // 자식(e.target)이 아닌 컨테이너(e.currentTarget=overviewRef)에 캡처해야
+            // 모바일에서 자식이 바뀌어도 캡처가 끊기지 않는다.
+            e.currentTarget.setPointerCapture?.(e.pointerId);
             wtdDraggedRef.current = true;
             setWtdDrag({ date: pos.date, startMin: pos.min, currentMin: pos.min });
           }}

@@ -88,8 +88,10 @@ export default function PlaceAutocomplete({
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const listboxId = "place-autocomplete-listbox";
 
   // Sync external value changes
   useEffect(() => {
@@ -114,6 +116,8 @@ export default function PlaceAutocomplete({
 
       if (!API_KEY) return;
 
+      setHighlightedIndex(-1);
+
       clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(async () => {
         if (input.length < 2) {
@@ -124,7 +128,8 @@ export default function PlaceAutocomplete({
         setLoading(true);
         const results = await fetchSuggestions(input);
         setSuggestions(results);
-        setShowDropdown(results.length > 0);
+        setHighlightedIndex(-1);
+        setShowDropdown(true);
         setLoading(false);
       }, 300);
     },
@@ -133,6 +138,7 @@ export default function PlaceAutocomplete({
 
   const handleSelect = async (suggestion: Suggestion) => {
     setShowDropdown(false);
+    setHighlightedIndex(-1);
     setQuery(suggestion.displayName);
 
     const details = await fetchPlaceDetails(suggestion.placeId);
@@ -141,6 +147,27 @@ export default function PlaceAutocomplete({
       setQuery(details.name);
     } else {
       onChange({ name: suggestion.displayName, place_id: suggestion.placeId });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!showDropdown && suggestions.length > 0) setShowDropdown(true);
+      if (suggestions.length === 0) return;
+      setHighlightedIndex((i) => (i + 1) % suggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (suggestions.length === 0) return;
+      setHighlightedIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === "Enter") {
+      if (showDropdown && highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+        e.preventDefault();
+        handleSelect(suggestions[highlightedIndex]);
+      }
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+      setHighlightedIndex(-1);
     }
   };
 
@@ -153,7 +180,12 @@ export default function PlaceAutocomplete({
         onFocus={() => {
           if (suggestions.length > 0) setShowDropdown(true);
         }}
+        onKeyDown={handleKeyDown}
         placeholder={placeholder}
+        role="combobox"
+        aria-expanded={showDropdown}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
           focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
       />
@@ -164,20 +196,37 @@ export default function PlaceAutocomplete({
         </div>
       )}
 
-      {showDropdown && suggestions.length > 0 && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-          {suggestions.map((s) => (
-            <button
-              key={s.placeId}
-              onClick={() => handleSelect(s)}
-              className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors border-b border-gray-50 dark:border-gray-700 last:border-0"
-            >
-              <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{s.displayName}</p>
-              {s.formattedAddress && (
-                <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{s.formattedAddress}</p>
-              )}
-            </button>
-          ))}
+      {showDropdown && (suggestions.length > 0 || (query.length > 0 && !loading)) && (
+        <div
+          id={listboxId}
+          role="listbox"
+          className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+        >
+          {suggestions.length > 0 ? (
+            suggestions.map((s, i) => (
+              <button
+                key={s.placeId}
+                role="option"
+                aria-selected={i === highlightedIndex}
+                onClick={() => handleSelect(s)}
+                onMouseEnter={() => setHighlightedIndex(i)}
+                className={`w-full text-left px-3 py-2 transition-colors border-b border-gray-50 dark:border-gray-700 last:border-0 ${
+                  i === highlightedIndex
+                    ? "bg-blue-50 dark:bg-blue-900/30"
+                    : "hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                }`}
+              >
+                <p className="text-sm text-gray-800 dark:text-gray-200 truncate">{s.displayName}</p>
+                {s.formattedAddress && (
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{s.formattedAddress}</p>
+                )}
+              </button>
+            ))
+          ) : (
+            <div className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500 select-none">
+              검색 결과가 없습니다
+            </div>
+          )}
         </div>
       )}
     </div>

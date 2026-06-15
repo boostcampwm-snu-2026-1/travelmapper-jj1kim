@@ -28,6 +28,9 @@ export default function TimeFieldInput({
   const hour = hh || "00";
   const minute = mm || "00";
   const [open, setOpen] = useState(false);
+  // Keyboard roving highlight: which column ("hour" | "minute") and index within it
+  const [activeCol, setActiveCol] = useState<"hour" | "minute">("hour");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const hourListRef = useRef<HTMLDivElement>(null);
   const minListRef = useRef<HTMLDivElement>(null);
@@ -55,6 +58,9 @@ export default function TimeFieldInput({
     if (minListRef.current && mIdx >= 0) {
       minListRef.current.scrollTop = mIdx * 32 - 32;
     }
+    // Initialize keyboard highlight on the hour column at the current value
+    setActiveCol("hour");
+    setHighlightedIndex(hIdx >= 0 ? hIdx : 0);
   }, [open, hour, minute]);
 
   const selectHour = (h: string) => {
@@ -66,11 +72,41 @@ export default function TimeFieldInput({
     setOpen(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!open) return;
+    const list = activeCol === "hour" ? HOURS : MINUTES;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i + 1) % list.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((i) => (i <= 0 ? list.length - 1 : i - 1));
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      setActiveCol("minute");
+      setHighlightedIndex(Math.max(0, MINUTES.indexOf(minute)));
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      setActiveCol("hour");
+      setHighlightedIndex(Math.max(0, HOURS.indexOf(hour)));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (highlightedIndex < 0) return;
+      if (activeCol === "hour") selectHour(HOURS[highlightedIndex]);
+      else selectMinute(MINUTES[highlightedIndex]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
+
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className="relative" onKeyDown={handleKeyDown}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className="flex items-center gap-0 border border-gray-300 dark:border-gray-600 rounded-lg
           overflow-hidden w-[72px] cursor-pointer hover:border-blue-400
           focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -86,15 +122,21 @@ export default function TimeFieldInput({
           style={{ width: 72 }}>
           {/* Hours */}
           <div ref={hourListRef}
+            role="listbox"
             className="flex-1 overflow-y-auto overflow-x-hidden border-r border-gray-100 dark:border-gray-700
               scrollbar-hide"
             style={{ maxHeight: 150 }}>
-            {HOURS.map((h) => (
+            {HOURS.map((h, i) => (
               <button key={h} type="button"
+                role="option"
+                aria-selected={h === hour}
                 onClick={() => selectHour(h)}
+                onMouseEnter={() => { setActiveCol("hour"); setHighlightedIndex(i); }}
                 className={`w-full text-center text-xs py-1 transition-colors ${
                   h === hour
                     ? "bg-blue-500 text-white font-medium"
+                    : activeCol === "hour" && i === highlightedIndex
+                    ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}>
                 {h}
@@ -103,14 +145,20 @@ export default function TimeFieldInput({
           </div>
           {/* Minutes */}
           <div ref={minListRef}
+            role="listbox"
             className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide"
             style={{ maxHeight: 150 }}>
-            {MINUTES.map((m) => (
+            {MINUTES.map((m, i) => (
               <button key={m} type="button"
+                role="option"
+                aria-selected={m === minute}
                 onClick={() => selectMinute(m)}
+                onMouseEnter={() => { setActiveCol("minute"); setHighlightedIndex(i); }}
                 className={`w-full text-center text-xs py-1 transition-colors ${
                   m === minute
                     ? "bg-blue-500 text-white font-medium"
+                    : activeCol === "minute" && i === highlightedIndex
+                    ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}>
                 {m}
