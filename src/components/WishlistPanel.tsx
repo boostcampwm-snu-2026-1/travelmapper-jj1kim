@@ -11,6 +11,7 @@ import {
   TimeBlock,
 } from "@/lib/types";
 import { createGuard } from "@/lib/guard";
+import { getDatesInRange } from "@/lib/time";
 import TransportForm from "./TransportForm";
 import PlaceForm from "./PlaceForm";
 import StayForm from "./StayForm";
@@ -89,20 +90,6 @@ function stayAvailableSlots(d: StayDetails): TimeBlock[] {
     });
   }
   return slots;
-}
-
-function getDatesInRange(start: string, end: string): string[] {
-  const dates: string[] = [];
-  const cur = new Date(start + "T00:00:00");
-  const last = new Date(end + "T00:00:00");
-  while (cur <= last) {
-    const y = cur.getFullYear();
-    const m = String(cur.getMonth() + 1).padStart(2, "0");
-    const dd = String(cur.getDate()).padStart(2, "0");
-    dates.push(`${y}-${m}-${dd}`);
-    cur.setDate(cur.getDate() + 1);
-  }
-  return dates;
 }
 
 function getCost(item: WishlistItem): number {

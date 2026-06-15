@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
+import { MAX_EXTEND_DAYS, EXTEND_THRESHOLD_DAYS } from "@/lib/constants";
 
 // PUT /api/schedules/[id]/extend — Extend schedule expiration
 export async function PUT(
@@ -10,7 +11,7 @@ export async function PUT(
     const { id } = await params;
     const { days } = await request.json();
 
-    if (!days || days < 1 || days > 90) {
+    if (!days || days < 1 || days > MAX_EXTEND_DAYS) {
       return NextResponse.json(
         { error: "연장 기간은 1일 이상 90일 이하로 설정해주세요." },
         { status: 400 }
@@ -34,7 +35,7 @@ export async function PUT(
       (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    if (remainingDays > 30) {
+    if (remainingDays > EXTEND_THRESHOLD_DAYS) {
       return NextResponse.json(
         { error: "만료까지 30일 이하로 남았을 때만 연장할 수 있습니다." },
         { status: 400 }

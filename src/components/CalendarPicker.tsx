@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { WEEKDAYS } from "@/lib/time";
 
 interface CalendarPickerProps {
   onDatesSelected: (start: string, end: string) => void;
@@ -23,7 +24,6 @@ function formatDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const MONTHS = [
   "1월", "2월", "3월", "4월", "5월", "6월",
   "7월", "8월", "9월", "10월", "11월", "12월",

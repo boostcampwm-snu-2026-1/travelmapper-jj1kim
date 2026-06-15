@@ -9,6 +9,7 @@ import WishlistPanel from "@/components/WishlistPanel";
 import WhatToDoPanel from "@/components/WhatToDoPanel";
 import ThemeToggle from "@/components/ThemeToggle";
 import MapViewModal from "@/components/MapViewModal";
+import { validateScheduleName, validatePassword, validateExpiresInDays } from "@/lib/validation";
 
 type View = "landing" | "calendar" | "timeline";
 type Mode = "create" | "login";
@@ -100,25 +101,13 @@ export default function Home() {
       return;
     }
 
-    // Validate schedule name: no emoji, only letters/numbers/spaces/common symbols
-    const nameRegex = /^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s\-_.,!?@#&()'+:;/\\]+$/;
-    if (!nameRegex.test(name)) {
-      setError("스케줄 이름에 이모지나 특수 문자를 사용할 수 없습니다.");
-      return;
-    }
-
-    // Validate password: 4-20 chars, lowercase + numbers only
-    const pwRegex = /^[a-z0-9]{4,20}$/;
-    if (!pwRegex.test(password)) {
-      setError("비밀번호는 4~20자의 영문 소문자와 숫자 조합이어야 합니다.");
-      return;
-    }
-
+    const nameCheck = validateScheduleName(name);
+    if (!nameCheck.ok) { setError(nameCheck.error!); return; }
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.ok) { setError(pwCheck.error!); return; }
+    const daysCheck = validateExpiresInDays(expiresInDays);
+    if (!daysCheck.ok) { setError(daysCheck.error!); return; }
     const days = parseInt(expiresInDays, 10);
-    if (!days || days < 1 || days > 90) {
-      setError("만료 기한은 1일 이상 90일 이하로 입력해주세요.");
-      return;
-    }
 
     setLoading(true);
     try {
